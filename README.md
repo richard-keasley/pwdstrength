@@ -8,7 +8,7 @@ password strength calculator
 - Character variety - Checks for lowercase, uppercase, numbers, and special characters
 - Pattern detection - Identifies sequential characters (abc, 123) and common weak patterns
 - Strength scoring - Rates passwords on a 0-5 scale with percentage
-- 
+
 ## Main Methods
 
 - calculate($password, $username) - Returns detailed strength analysis
