@@ -19,10 +19,10 @@ require_once __DIR__ . '/pwdstrength.php';
 use basecamp\pwdstrength;
 
 $postvals = [];
-$format = '<p><label>%1$s</label> <input name="%1$s" value="%2$s"></p>';
+$format = '<p><label>%1$s</label> <input style="width:30em" name="%1$s" value="%2$s"></p>';
 $keys = ['username', 'password'];
 foreach($keys as $key) {
-	$val = (string) filter_input(INPUT_POST, $key);
+	$val = trim((string) filter_input(INPUT_POST, $key));
 	printf($format, $key, $val);
 	$postvals[$key] = $val;
 }
