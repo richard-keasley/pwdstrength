@@ -7,6 +7,7 @@ namespace basecamp;
 class pwdstrength {
 	
 const encoding = 'UTF-8';
+const charscore = 5;
 	
 /**
  * Calculate the strength of a password
@@ -123,73 +124,38 @@ private static function char_ord(string $char): int {
  * @return array[?feedback, ?score]
  **************************************/
 
-private static function check_username(string $password, $username=null) : array {
-	// Check if username is included in the password (Unicode-aware)	
-	
-	if(empty($username)) return [];
-
-	// Ensure both strings are normalized and lowercased 
-	$password = mb_strtolower(self::normalize($password), self::encoding);
-	$username = mb_strtolower(self::normalize((string) $username), self::encoding);
-
-	// Check if username appears as a substring (multibyte-safe)
-	if(mb_strpos($password, $username, 0, self::encoding) !== false) {
-		return [
-			'feedback' => 'Password should not contain your username',
-			'score' => -30,
-		];	
-	}
-
-	// Check if significant portions of username appear
-	$check_len = 3; // check length
-	$user_len = mb_strlen($username, self::encoding);
-	for($i=0; $i<$user_len; $i++) {
-		$part = mb_substr($username, $i, $check_len, self::encoding);
-		$part_len = mb_strlen($part, self::encoding);
-		if($part_len<$check_len) continue;
-		if(mb_strpos($password, $part, 0, self::encoding) !== false) {
-			return [
-				'feedback' => 'Password should not contain part of your username',
-				'score' => -15,
-			];
-		}
-	}
-
-	return [];
-}
-
 private static function check_length(string $password) : array {
 	// Check password length (characters, not bytes)
 	$length = mb_strlen($password, self::encoding);
-	$retval = ['score' => min(75, ($length - 2) * 3)];
+	$retval = ['score' => min(75, ($length - 4) * self::charscore)];
 	if($length < 6) $retval['feedback'] = 'Make password longer';
 	return $retval;
 }
 
 private static function check_lowercase(string $password) : array {
 	// Check for lowercase letters (Unicode-aware)
-	$success = ['score' => 8];
+	$success = ['score' => 4];
 	$fail = ['feedback' => 'Add lowercase letters to your password'];
 	return preg_match('/\p{Ll}/u', $password) ? $success : $fail ;
 }
 
 private static function check_uppercase(string $password) : array {
 	// Check for uppercase letters (Unicode-aware)
-	$success = ['score' => 8];
+	$success = ['score' => 4];
 	$fail = ['feedback' => 'Add uppercase letters to your password'];
 	return preg_match('/\p{Lu}/u', $password) ? $success : $fail ;
 }
 
 private static function check_numbers(string $password) : array {
 	// Check for numbers (Unicode digits)
-	$success = ['score' => 12];
+	$success = ['score' => 8];
 	$fail = ['feedback' => 'Add numbers to your password'];
 	return preg_match('/\p{Nd}/u', $password) ? $success : $fail ;
 }
 
 private static function check_symbols(string $password) : array {
 	// Check for special characters (punctuation, symbols, separators)
-	$success = ['score' => 16];
+	$success = ['score' => 12];
 	$fail = ['feedback' => 'Add punctuation or symbols to your password'];
 	return preg_match('/[\p{P}\p{S}\p{Z}]/u', $password) ? $success : $fail ;
 }
@@ -198,7 +164,7 @@ private static function check_repeated(string $password) : array {
 	// Check for repeated characters (Unicode-aware)
 	$success = [];
     $fail = [
-		'score' => -10,
+		'score' => -15,
 		'feedback' => 'Avoid repeated characters (e.g., "aaa")'
 	];
 	return preg_match('/(.)\1{2,}/u', $password) ? $fail : $success ;
@@ -206,12 +172,6 @@ private static function check_repeated(string $password) : array {
 
 private static function check_sequential(string $password) : array {
 	// Check for sequential characters (Unicode-aware)
-	$success = [];
-    $fail = [
-		'score' => -10,
-		'feedback' => 'Avoid sequential characters (e.g., "abc", "123")'
-	];
-	
 	$password = mb_strtolower(self::normalize((string) $password), self::encoding);
 	$len = mb_strlen($password, self::encoding);
 	
@@ -220,56 +180,92 @@ private static function check_sequential(string $password) : array {
 	for($i = 0; $i < $len; $i++) {
 		$chars[] = mb_substr($password, $i, 1, self::encoding);
 	}
-
+	
+	$fail = false;
 	for($i = 0; $i < count($chars) - 2; $i++) {
-		$o1 = self::char_ord($chars[$i]);
-		$o2 = self::char_ord($chars[$i+1]);
-		$o3 = self::char_ord($chars[$i+2]);
+		$sequence = mb_substr($password, $i, 3, self::encoding);
+		$o1 = self::char_ord($sequence[0]);
+		$o2 = self::char_ord($sequence[1]);
+		$o3 = self::char_ord($sequence[2]);
 		if($o1===0 || $o2===0 || $o3===0) continue;
 
 		// Ascending sequence
-		if ($o1 + 1 === $o2 && $o2 + 1 === $o3) return $fail;
+		if($o1 + 1 === $o2 && $o2 + 1 === $o3) $fail = true;
 		// Descending sequence
-		if ($o1 - 1 === $o2 && $o2 - 1 === $o3) return $fail;
+		if($o1 - 1 === $o2 && $o2 - 1 === $o3) $fail = true;
+		
+		if($fail) {
+			return [
+				'score' => -15,
+				'feedback' => "Avoid sequential characters ('{$sequence}')",
+			];
+		}
 	}
 
-    return $success;
+    return [];
 }
+
+private static $dictionary = null;
 
 private static function check_patterns(string $password) : array {
 	// Check for common password patterns (Unicode-aware lowercase check)
-	$success = [];
-    $fail = [
-		'score' => -20,
-		'feedback' => 'Avoid common patterns like "password", "123456", "qwerty"',
-	];
+    $password = mb_strtolower(self::normalize((string) $password), self::encoding);
 
-	$commonPatterns = [
-		'password',
-		'123456',
-		'12345678',
-		'qwerty',
-		'abc123',
-		'111111',
-		'admin',
-		'letmein',
-		'welcome',
-		'monkey',
-		'1234567',
-		'dragon',
-		'master',
-		'sunshine',
-		'princess',
-		'qazwsx',
-	];
-	$password = mb_strtolower(self::normalize((string) $password), self::encoding);
-
-	foreach($commonPatterns as $pattern) {
-		if(mb_strpos($password, $pattern, 0, self::encoding) !== false) {
-			return $fail;
+	if(!self::$dictionary) {
+		self::$dictionary = [];
+		$filename = __DIR__ . '/dictionary.txt';
+		foreach(file($filename) as $row) {
+			$row = trim($row);
+			if($row) self::$dictionary[] = $row;	
 		}
 	}
-	return $success;
+	
+	foreach(self::$dictionary as $pattern) {
+		if(mb_strpos($password, $pattern, 0, self::encoding) !== false) {
+			return [
+				'score' => -10 - (strlen($pattern) * self::charscore),
+				'feedback' => "Avoid common patterns like '{$pattern}'",
+			];
+		}
+	}
+	
+	return [];
 }
+
+private static function check_username(string $password, $username=null) : array {
+	// Check if username is included in the password (Unicode-aware)	
+	
+	if(empty($username)) return [];
+
+	// Ensure both strings are normalized and lowercased 
+	$password = mb_strtolower(self::normalize($password), self::encoding);
+	$username = mb_strtolower(self::normalize((string) $username), self::encoding);
+	$user_len = mb_strlen($username, self::encoding);
+	
+	// Check if significant portions of username appear
+	for($check_len=$user_len; $check_len>2; $check_len--) {
+		for($i=0; $i<$user_len; $i++) {
+			$part = mb_substr($username, $i, $check_len, self::encoding);
+			$part_len = mb_strlen($part, self::encoding);
+			if($part_len<$check_len) continue;
+			$start = mb_strpos($password, $part, 0, self::encoding);
+			if($start !== false) {
+				// found a part
+				return ($check_len==$user_len) ? 
+					[
+						'score' => -20 - ($check_len * self::charscore),
+						'feedback' => 'Password should not contain your username',
+					] :
+					[
+						'feedback' => 'Password should not contain part of your username',
+						'score' => -5 - ($check_len * self::charscore),
+					];
+			}
+		}
+	}
+
+	return [];
+}
+
 
 }
