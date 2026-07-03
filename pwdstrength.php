@@ -18,6 +18,7 @@ const encoding = 'UTF-8';
  *      - label: Human-readable strength label
  *      - percentage: Strength as a percentage (0-100)
  *      - feedback: Array of feedback messages
+ *      - scores: array of scores from each test 
  */
 public static function calculate($password, $username=null) {
 	
@@ -42,9 +43,9 @@ public static function calculate($password, $username=null) {
 	}
 		
 	// Normalize score to 0-100 range
-	$percentage = array_sum($scores);
-	$percentage = max(0, min(100, $percentage));
-	$strengthLevel = (int) round($percentage/20);
+	$percentage = max(0, min(100, array_sum($scores)));
+	// strength score range 0-5
+	$strengthLevel = (int) round($percentage / 20);
 
 	return [
 		'strength' => $strengthLevel,
