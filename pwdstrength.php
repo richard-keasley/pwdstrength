@@ -27,6 +27,9 @@ public static function calculate($password, $username=null) {
 	$password = self::normalize((string) $password);
 	$username = $username !== null ? self::normalize((string) $username) : null;
 	
+	echo self::entropy($password);
+	
+	
 	$checknames = [
 		'length', 
 		'lowercase', 'uppercase', 'numbers', 'symbols',
@@ -86,6 +89,43 @@ public static function isSufficient($password, $username=null, $minStrength=2) {
 	$result = self::calculate($password, $username);
 	return $result['strength'] >= $minStrength;
 }
+
+public static function entropy(string $password) {
+	// pattern, ASCII size, Unicode size
+	$chargroups = [
+		'lowercase' => ['/\p{Ll}/u', 26, 100],
+		'uppercase' => ['/\p{Lu}/u', 26, 80],
+		'number' => ['/\p{N}/u', 10, 10],
+		'symbol' => ['/[\p{P}\p{S}\p{Z}]/u', 32, 35],
+	];
+	
+	$sizes = [];
+	$chars = mb_str_split($password);
+	foreach($chars as $char) {
+		$chargroup = null;
+		foreach($chargroups as $groupname=>$data) {
+			if(!$chargroup && preg_match($data[0], $char)) $chargroup = $groupname;
+		}
+		if(!$chargroup) $chargroup='other';
+				
+		$ascii = preg_match('/[\x00-\x7F]/u', $char);
+		if($ascii) {
+			$size = $chargroups[$chargroup][1];
+			$key = $chargroup;
+		}
+		else {
+			$size = $chargroups[$chargroup][2];
+			$key = "{$chargroup}_u";
+		}
+		$sizes[$key] = $size;		
+		echo " $char-$key: $size <br>";
+	}
+	print_r($sizes);
+	
+	$size = array_sum($sizes);
+	echo $size;
+}
+
 
 
 /**
