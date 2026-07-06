@@ -4,7 +4,8 @@
  * Password Entropy Calculator
  * 
  * Calculates the entropy (strength) of a password based on character set
- * diversity and length.
+ * diversity and length. Adds UTF-8 support using multibyte string functions
+ * and Unicode-aware regular expressions.
  */
 class PasswordEntropyCalculator
 {
@@ -20,7 +21,8 @@ class PasswordEntropyCalculator
     public function calculateEntropy(string $password): float
     {
         $charsetSize = $this->getCharsetSize($password);
-        $passwordLength = strlen($password);
+        // Use multibyte-aware length when available
+        $passwordLength = function_exists('mb_strlen') ? mb_strlen($password, 'UTF-8') : strlen($password);
         
         if ($charsetSize === 0 || $passwordLength === 0) {
             return 0;
@@ -33,38 +35,69 @@ class PasswordEntropyCalculator
     /**
      * Get the character set size based on character types in the password
      *
+     * This method is Unicode-aware. It counts common ASCII groups precisely
+     * (e.g. 26 lowercase Latin letters) and adds heuristic estimates for
+     * non-ASCII Unicode letters, punctuation and symbols.
+     *
      * @param string $password The password to analyze
      * @return int The size of the character set
      */
     private function getCharsetSize(string $password): int
     {
         $charsetSize = 0;
-        
-        // Check for lowercase letters (26 possible characters)
+
+        // ASCII groups (precise sizes)
+        // Check for ASCII lowercase letters (26 possible characters)
         if (preg_match('/[a-z]/', $password)) {
             $charsetSize += 26;
         }
-        
-        // Check for uppercase letters (26 possible characters)
+
+        // Check for ASCII uppercase letters (26 possible characters)
         if (preg_match('/[A-Z]/', $password)) {
             $charsetSize += 26;
         }
-        
-        // Check for digits (10 possible characters)
+
+        // Check for ASCII digits (10 possible characters)
         if (preg_match('/[0-9]/', $password)) {
             $charsetSize += 10;
         }
-        
-        // Check for special characters (32 common special characters)
-        if (preg_match('/[!@#$%^&*()\-_=+\[\]{};:\'",.<>?\/\\|`~]/', $password)) {
+
+        // Check for common ASCII special characters (32 common special characters)
+        if (preg_match('/[!@#$%^&*()\-_=+\[\]{};:\\'",.<>?\/\\\\|`~]/', $password)) {
             $charsetSize += 32;
         }
-        
-        // Check for other special characters
-        if (preg_match('/[^\w!@#$%^&*()\-_=+\[\]{};:\'",.<>?\/\\|`~\s]/', $password)) {
-            $charsetSize += 10;
+
+        // Unicode-aware checks for non-ASCII characters
+        $hasNonAscii = preg_match('/[^\x00-\x7F]/u', $password);
+
+        if ($hasNonAscii) {
+            // If password contains Unicode letters (includes non-Latin scripts)
+            if (preg_match('/\p{L}/u', $password)) {
+                // We already counted ASCII Latin letters above. For other scripts
+                // add a heuristic estimate. Many scripts have tens/hundreds of
+                // characters; 100 is a conservative estimate for a single script.
+                $charsetSize += 100;
+            }
+
+            // Unicode digits/punctuation/symbols
+            if (preg_match('/\p{N}/u', $password) && !preg_match('/[0-9]/', $password)) {
+                // Non-ASCII digits (rare) - estimate similar to ASCII digits
+                $charsetSize += 10;
+            }
+
+            if (preg_match('/\p{P}/u', $password) && !preg_match('/[!@#$%^&*()\-_=+\[\]{};:\\'",.<>?\/\\\\|`~]/', $password)) {
+                // Non-ASCII punctuation (estimate)
+                $charsetSize += 30;
+            }
+
+            if (preg_match('/\p{S}/u', $password)) {
+                // Symbols (includes emoji, currency symbols, math symbols, etc.)
+                // Emoji and symbol space is large; add a larger heuristic.
+                $charsetSize += 500;
+            }
         }
-        
+
+        // Fallback: if nothing matched, return 0
         return $charsetSize;
     }
     
@@ -99,16 +132,18 @@ class PasswordEntropyCalculator
     {
         $entropy = $this->calculateEntropy($password);
         $strength = $this->getStrengthRating($entropy);
-        
+        $length = function_exists('mb_strlen') ? mb_strlen($password, 'UTF-8') : strlen($password);
+
         return [
-            'password_length' => strlen($password),
+            'password_length' => $length,
             'entropy_bits' => round($entropy, 2),
             'strength' => $strength,
             'charset_size' => $this->getCharsetSize($password),
-            'has_lowercase' => (bool) preg_match('/[a-z]/', $password),
-            'has_uppercase' => (bool) preg_match('/[A-Z]/', $password),
-            'has_digits' => (bool) preg_match('/[0-9]/', $password),
-            'has_special_chars' => (bool) preg_match('/[^\w\s]/', $password),
+            // Use Unicode-aware checks for properties
+            'has_lowercase' => (bool) preg_match('/\p{Ll}/u', $password),
+            'has_uppercase' => (bool) preg_match('/\p{Lu}/u', $password),
+            'has_digits' => (bool) preg_match('/\p{N}/u', $password),
+            'has_special_chars' => (bool) preg_match('/[^\p{L}\p{N}\s]/u', $password),
         ];
     }
 }
