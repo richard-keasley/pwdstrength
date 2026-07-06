@@ -27,9 +27,6 @@ public static function calculate($password, $username=null) {
 	$password = self::normalize((string) $password);
 	$username = $username !== null ? self::normalize((string) $username) : null;
 	
-	echo self::entropy($password);
-	
-	
 	$checknames = [
 		'length', 
 		'lowercase', 'uppercase', 'numbers', 'symbols',
@@ -52,6 +49,7 @@ public static function calculate($password, $username=null) {
 	$strengthLevel = (int) round($percentage / 20);
 
 	return [
+		'entropy' => self::entropy($password),
 		'strength' => $strengthLevel,
 		'label' => self::getLabel($strengthLevel),
 		'percentage' => $percentage,
@@ -90,7 +88,7 @@ public static function isSufficient($password, $username=null, $minStrength=2) {
 	return $result['strength'] >= $minStrength;
 }
 
-public static function entropy(string $password) {
+public static function entropy(string $password) : float {
 	// pattern, ASCII size, Unicode size
 	$chargroups = [
 		'lowercase' => ['/\p{Ll}/u', 26, 100],
@@ -106,24 +104,41 @@ public static function entropy(string $password) {
 		foreach($chargroups as $groupname=>$data) {
 			if(!$chargroup && preg_match($data[0], $char)) $chargroup = $groupname;
 		}
-		if(!$chargroup) $chargroup='other';
 				
 		$ascii = preg_match('/[\x00-\x7F]/u', $char);
-		if($ascii) {
-			$size = $chargroups[$chargroup][1];
-			$key = $chargroup;
+		
+		if($chargroup) {
+			if($ascii) {
+				$size = $chargroups[$chargroup][1];
+				$key = $chargroup;
+			}
+			else {
+				$size = $chargroups[$chargroup][2];
+				$key = "{$chargroup}_u";
+			}
 		}
 		else {
-			$size = $chargroups[$chargroup][2];
-			$key = "{$chargroup}_u";
+			if($ascii) {
+				$size = 10;
+				$key = 'other';
+			}
+			else {
+				$size = 50;
+				$key = 'other_u';
+			}
 		}
+		
 		$sizes[$key] = $size;		
-		echo " $char-$key: $size <br>";
+		# echo " $char-$key: $size <br>";
 	}
-	print_r($sizes);
+	# print_r($sizes);
 	
 	$size = array_sum($sizes);
-	echo $size;
+	$strlen = mb_strlen($password, self::encoding);
+    # echo "$strlen $size ";
+	   
+	// Entropy = log2(charset_size ^ password_length)
+	return ($size && $strlen) ? log($size ** $strlen, 2) : 0;	
 }
 
 
