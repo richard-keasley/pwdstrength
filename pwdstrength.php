@@ -7,7 +7,7 @@ namespace basecamp;
 class pwdstrength {
 	
 const encoding = 'UTF-8';
-const charscore = 5;
+const charscore = 5; // used in calculation of penalties in password
 	
 /**
  * Calculate the strength of a password
@@ -28,51 +28,40 @@ public static function calculate($password, $username=null) {
 	$username = $username !== null ? self::normalize((string) $username) : null;
 	
 	$checknames = [
-		'length', 
-		'lowercase', 'uppercase', 'numbers', 'symbols',
+		'entropy',
 		'username', 'repeated', 'sequential', 'patterns',
 	];
 	$scores = [];
-	$feedback = [];
+	$feedback = null;
 	foreach($checknames as $checkname) {
 		$res = self::{"check_{$checkname}"}($password, $username);
 		$check_score = $res['score'] ?? 0;
-		$check_feedback = $res['feedback'] ?? null;
-		if($check_feedback) $feedback[$checkname] = $check_feedback;
 		$scores[$checkname] = $check_score;
+		$check_feedback = $res['feedback'] ?? null;
+		if($check_feedback) $feedback = $check_feedback;
 		# echo $checkname; print_r($res);
 	}
 		
 	// Normalize score to 0-100 range
 	$percentage = max(0, min(100, array_sum($scores)));
-	// strength score range 0-5
-	$strengthLevel = (int) round($percentage / 20);
-
-	return [
-		'entropy' => self::entropy($password),
-		'strength' => $strengthLevel,
-		'label' => self::getLabel($strengthLevel),
-		'percentage' => $percentage,
-		'feedback' => $feedback,
-		'scores' => $scores,
-	];
-}
-
-/**
- * Get the label for a given password strength
- * @param int $strength The strength level (0-5)
- * @return string The strength label
- */
-public static function getLabel($strength) {
-	return match((int) $strength) {
+	$strength = self::getStrength($percentage);
+	$label = match($strength) {
 		0 => 'Very Weak',
 		1 => 'Weak',
 		2 => 'Fair',
 		3 => 'Good',
 		4 => 'Strong',
 		5 => 'Very Strong',
-		default => 'Unknown'
+		default => '??'
 	};
+
+	return [
+		'label' => $label,
+		'strength' => $strength,
+		'percentage' => $percentage,
+		'feedback' => $feedback,
+		'scores' => $scores,
+	];
 }
 
 /**
@@ -88,7 +77,57 @@ public static function isSufficient($password, $username=null, $minStrength=2) {
 	return $result['strength'] >= $minStrength;
 }
 
-public static function entropy(string $password) : float {
+/**
+ * Get strength level for a given password score
+ * @param int $score (0-100)
+ * @return int strength level (0-5)
+ */
+private static function getStrength(int $score) : int {
+	if($score<10) return 0;
+	if($score<30) return 1;
+	if($score<50) return 2;
+	if($score<70) return 3;
+	if($score<90) return 4;
+	return 5;
+}
+
+/**
+ * Normalize string to NFC when possible
+ */
+private static function normalize(string $str): string {
+	if(class_exists('Normalizer')) {
+		try {
+			$str = \Normalizer::normalize($str, \Normalizer::FORM_C);
+		} 
+		catch(\Throwable $ex) {
+			// ignore normalization failures and return original
+		}
+	}
+	return $str;
+}
+
+/**
+ * Get code point for a single character
+ */
+private static function char_ord(string $char): int {
+	$u = mb_convert_encoding($char, 'UCS-4BE', self::encoding);
+	$val = unpack('N', $u);
+	return $val[1] ?? 0;
+}
+
+/*************************************
+ * all checks below
+ * 
+ * https://www.php.net/manual/en/regexp.reference.unicode.php
+ *
+ * @param string $password
+ * @param string $username (optional)
+ *
+ * all return array elements are optional 
+ * @return array[?feedback, ?score]
+ **************************************/
+
+private static function check_entropy(string $password) : array {
 	// pattern, ASCII size, Unicode size
 	$chargroups = [
 		'lowercase' => ['/\p{Ll}/u', 26, 100],
@@ -135,84 +174,36 @@ public static function entropy(string $password) : float {
 	
 	$size = array_sum($sizes);
 	$strlen = mb_strlen($password, self::encoding);
-    # echo "$strlen $size ";
-	   
 	// Entropy = log2(charset_size ^ password_length)
-	return ($size && $strlen) ? log($size ** $strlen, 2) : 0;	
-}
-
-
-
-/**
- * Normalize string to NFC when possible
- */
-private static function normalize(string $str): string {
-	if(class_exists('Normalizer')) {
-		try {
-			$str = \Normalizer::normalize($str, \Normalizer::FORM_C);
-		} 
-		catch(\Throwable $ex) {
-			// ignore normalization failures and return original
+	$score = ($size && $strlen) ? log($size ** $strlen, 2) : 0;
+	
+	// normalize score 0-100
+	$score = 0.1 * $score ** 1.4;
+	$score = (int) round(min(100, $score));
+	
+	// send feedback
+	$feedback = null;
+	if($strlen < 6) $feedback = 'Make password longer';
+	if(!$feedback) {
+		foreach(array_keys($chargroups) as $groupname) {
+			$success = isset($sizes[$groupname]);
+			if(!$success) {
+				$label = match($groupname) {
+					'uppercase', 
+					'lowercase' => "{$groupname} letters",
+					default => "{$groupname}s"
+				};
+				$feedback = "Add {$label} to your password";
+				break;
+			}
 		}
 	}
-	return $str;
-}
-
-/**
- * Get code point for a single character
- */
-private static function char_ord(string $char): int {
-	$u = mb_convert_encoding($char, 'UCS-4BE', self::encoding);
-	$val = unpack('N', $u);
-	return $val[1] ?? 0;
-}
-
-/*************************************
- * all checks below
- * 
- * https://www.php.net/manual/en/regexp.reference.unicode.php
- *
- * @param string $password
- * @param string $username (optional)
- *
- * all return array elements are optional 
- * @return array[?feedback, ?score]
- **************************************/
-
-private static function check_length(string $password) : array {
-	// Check password length (characters, not bytes)
-	$length = mb_strlen($password, self::encoding);
-	$retval = ['score' => min(75, ($length - 4) * self::charscore)];
-	if($length < 6) $retval['feedback'] = 'Make password longer';
+		
+	$retval = ['score' => $score];
+	if($feedback) $retval['feedback'] = $feedback;
+	# print_r($retval);
+	
 	return $retval;
-}
-
-private static function check_lowercase(string $password) : array {
-	// Check for lowercase letters (Unicode-aware)
-	$success = ['score' => 4];
-	$fail = ['feedback' => 'Add lowercase letters to your password'];
-	return preg_match('/\p{Ll}/u', $password) ? $success : $fail ;
-}
-
-private static function check_uppercase(string $password) : array {
-	// Check for uppercase letters (Unicode-aware)
-	$success = ['score' => 4];
-	$fail = ['feedback' => 'Add uppercase letters to your password'];
-	return preg_match('/\p{Lu}/u', $password) ? $success : $fail ;
-}
-
-private static function check_numbers(string $password) : array {
-	// Check for numbers (Unicode digits)
-	$success = ['score' => 8];
-	$fail = ['feedback' => 'Add numbers to your password'];
-	return preg_match('/\p{Nd}/u', $password) ? $success : $fail ;
-}
-
-private static function check_symbols(string $password) : array {
-	// Check for special characters (punctuation, symbols, separators)
-	$success = ['score' => 12];
-	$fail = ['feedback' => 'Add punctuation or symbols to your password'];
-	return preg_match('/[\p{P}\p{S}\p{Z}]/u', $password) ? $success : $fail ;
 }
 
 private static function check_repeated(string $password) : array {

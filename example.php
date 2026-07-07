@@ -29,12 +29,28 @@ foreach($keys as $key) {
 ?>
 <p><input type="submit" value="TEST"></p>
 </form>
-<pre>
 <?php
-$arr = pwdstrength::calculate($postvals['password'], $postvals['username']);
-print_r($arr);
+
+htm_password($postvals['password'], $postvals['username']);
+
+$tries = [
+	'password',
+	'password-ijbkadcihvbwegwe',
+	'short',
+	'random',
+	'random-123',
+	'random-731',
+	'thr33-Simple-words',
+];
+foreach($tries as $password) htm_password($password, $postvals['username']);
 
 ?>
-</pre>
 </body>
 </html>
+<?php
+
+function htm_password($password, $username) {
+	echo "<h3>{$password}</h3>";
+	$arr = pwdstrength::calculate($password, $username);
+	printf('<pre>%s</pre>', print_r($arr, 1));
+}
