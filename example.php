@@ -38,9 +38,9 @@ $tries = [
 	'password-ijbkadcihvbwegwe',
 	'short',
 	'random',
-	'random-123',
+	'random-abc',
 	'random-731',
-	'thr33-Simple-words',
+	'thr33--Simple--words',
 ];
 foreach($tries as $password) htm_password($password, $postvals['username']);
 

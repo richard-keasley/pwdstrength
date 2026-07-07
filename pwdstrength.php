@@ -127,7 +127,7 @@ private static function char_ord(string $char): int {
  * @return array[?feedback, ?score]
  **************************************/
 
-private static function check_entropy(string $password) : array {
+private static function check_entropy(string $password, ?string $username=null) : array {
 	// pattern, ASCII size, Unicode size
 	$chargroups = [
 		'lowercase' => ['/\p{Ll}/u', 26, 100],
@@ -206,54 +206,53 @@ private static function check_entropy(string $password) : array {
 	return $retval;
 }
 
-private static function check_repeated(string $password) : array {
+private static function check_repeated(string $password, ?string $username=null) : array {
 	// Check for repeated characters (Unicode-aware)
-	$success = [];
-    $fail = [
-		'score' => -15,
-		'feedback' => 'Avoid repeated characters (e.g., "aaa")'
+	preg_match('/(.)\1{2,}/u', $password, $matches);
+	$match = $matches[0] ?? false;
+	if(!$match) return [];
+	
+	$strlen = mb_strlen($match, self::encoding);
+	return [
+		'score' => -10 - ($strlen * self::charscore),
+		'feedback' => 'Avoid repeated characters (e.g. "aaa")'
 	];
 	return preg_match('/(.)\1{2,}/u', $password) ? $fail : $success ;
 }
 
-private static function check_sequential(string $password) : array {
+private static function check_sequential(string $password, ?string $username=null) : array {
 	// Check for sequential characters (Unicode-aware)
 	$password = mb_strtolower(self::normalize((string) $password), self::encoding);
-	$len = mb_strlen($password, self::encoding);
-	
-	// Extract characters into array
-	$chars = [];
-	for($i = 0; $i < $len; $i++) {
-		$chars[] = mb_substr($password, $i, 1, self::encoding);
-	}
-	
-	$fail = false;
-	for($i = 0; $i < count($chars) - 2; $i++) {
-		$sequence = mb_substr($password, $i, 3, self::encoding);
-		$o1 = self::char_ord($sequence[0]);
-		$o2 = self::char_ord($sequence[1]);
-		$o3 = self::char_ord($sequence[2]);
-		if($o1===0 || $o2===0 || $o3===0) continue;
-
-		// Ascending sequence
-		if($o1 + 1 === $o2 && $o2 + 1 === $o3) $fail = true;
-		// Descending sequence
-		if($o1 - 1 === $o2 && $o2 - 1 === $o3) $fail = true;
+	$strlen = mb_strlen($password, self::encoding);
 		
-		if($fail) {
-			return [
-				'score' => -15,
-				'feedback' => "Avoid sequential characters ('{$sequence}')",
-			];
-		}
+	$maxlen = 0;
+	$last_ord = 0;
+	$ascending = [];
+	$descending = [];
+	for($pos = 0; $pos < $strlen; $pos++) {
+		$char = mb_substr($password, $pos, 1, self::encoding);
+		$ord = self::char_ord($char);
+		
+		if($ord==($last_ord+1)) $ascending[] = $ord;
+		else $ascending = [];
+		if($ord==($last_ord-1)) $descending[] = $ord;
+		else $descending = [];
+		
+		$maxlen = max($maxlen, count($ascending), count($descending));
+		$last_ord = $ord;
 	}
-
-    return [];
+	
+	if($maxlen<2) return [];
+	
+	return [
+		'score' => - (($maxlen+1) * self::charscore),
+		'feedback' => "Avoid sequential characters (e.g. abc, cba)",
+	];
 }
 
 private static $dictionary = null;
 
-private static function check_patterns(string $password) : array {
+private static function check_patterns(string $password, ?string $username=null) : array {
 	// Check for common password patterns (Unicode-aware lowercase check)
     $password = mb_strtolower(self::normalize((string) $password), self::encoding);
 
@@ -278,7 +277,7 @@ private static function check_patterns(string $password) : array {
 	return [];
 }
 
-private static function check_username(string $password, $username=null) : array {
+private static function check_username(string $password, ?string $username=null) : array {
 	// Check if username is included in the password (Unicode-aware)	
 	
 	if(empty($username)) return [];
@@ -312,6 +311,5 @@ private static function check_username(string $password, $username=null) : array
 
 	return [];
 }
-
 
 }

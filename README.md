@@ -1,7 +1,7 @@
 # pwdstrength
 password strength calculator 
 
-## key Features
+## Key Features
 
 - Username validation - Checks if the username (or significant portions) appears in the password
 - Length checking - Evaluates password length and provides feedback
@@ -13,4 +13,3 @@ password strength calculator
 
 - calculate($password, $username) - Returns detailed strength analysis
 - isSufficient($password, $username, $minScore) - Checks if password meets minimum requirements
-- getLabel($score) - Gets human-readable strength label
