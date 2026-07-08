@@ -17,4 +17,4 @@ password strength calculator
 ## Pattern dictionary
 
 The dictionary is `Pwdb_top-1000.txt`. Forked from 
-[Daniel Miessler's SecLists] (https://github.com/danielmiessler/SecLists/tree/master/Passwords/Common-Credentials).
+[Daniel Miessler's SecLists](https://github.com/danielmiessler/SecLists/tree/master/Passwords/Common-Credentials).
