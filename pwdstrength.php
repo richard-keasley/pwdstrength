@@ -17,11 +17,11 @@ const charscore = 5; // used in calculation of penalties in password
  * @return array An associative array containing:
  *      - strength: Strength level (0-5)
  *      - label: Human-readable strength label
- *      - percentage: Strength as a percentage (0-100)
  *      - feedback: Array of feedback messages
  *      - scores: array of scores from each test 
+ *      - score: Strength as a percentage (0-100)
  */
-public static function calculate($password, $username=null) {
+public static function calculate($password, $username=null) : array {
 	
 	// Normalize inputs (NFC) to treat composed/decomposed characters consistently
 	$password = self::normalize((string) $password);
@@ -39,28 +39,27 @@ public static function calculate($password, $username=null) {
 		$scores[$checkname] = $check_score;
 		$check_feedback = $res['feedback'] ?? null;
 		if($check_feedback) $feedback = $check_feedback;
-		# echo $checkname; print_r($res);
 	}
 		
 	// Normalize score to 0-100 range
-	$percentage = max(0, min(100, array_sum($scores)));
-	$strength = self::getStrength($percentage);
+	$score = max(0, min(100, array_sum($scores)));
+	$strength = self::getStrength($score);
 	$label = match($strength) {
-		0 => 'Very Weak',
-		1 => 'Weak',
-		2 => 'Fair',
-		3 => 'Good',
-		4 => 'Strong',
-		5 => 'Very Strong',
+		0 => 'very weak',
+		1 => 'weak',
+		2 => 'fair',
+		3 => 'good',
+		4 => 'strong',
+		5 => 'very strong',
 		default => '??'
 	};
 
 	return [
-		'label' => $label,
 		'strength' => $strength,
-		'percentage' => $percentage,
+		'label' => $label,
 		'feedback' => $feedback,
 		'scores' => $scores,
+		'score' => $score,
 	];
 }
 
@@ -72,7 +71,7 @@ public static function calculate($password, $username=null) {
  * @param int $minStrength Minimum strength required (0-5), default is 2 (Fair)
  * @return bool
  */
-public static function isSufficient($password, $username=null, $minStrength=2) {
+public static function isSufficient($password, $username=null, $minStrength=2) : bool {
 	$result = self::calculate($password, $username);
 	return $result['strength'] >= $minStrength;
 }
@@ -217,7 +216,6 @@ private static function check_repeated(string $password, ?string $username=null)
 		'score' => -10 - ($strlen * self::charscore),
 		'feedback' => 'Avoid repeated characters (e.g. "aaa")'
 	];
-	return preg_match('/(.)\1{2,}/u', $password) ? $fail : $success ;
 }
 
 private static function check_sequential(string $password, ?string $username=null) : array {
@@ -255,21 +253,27 @@ private static $dictionary = null;
 private static function check_patterns(string $password, ?string $username=null) : array {
 	// Check for common password patterns (Unicode-aware lowercase check)
     $password = mb_strtolower(self::normalize((string) $password), self::encoding);
-
+	
 	if(!self::$dictionary) {
 		self::$dictionary = [];
 		$filename = __DIR__ . '/dictionary.txt';
-		foreach(file($filename) as $row) {
-			$row = trim($row);
-			if($row) self::$dictionary[] = $row;	
-		}
+		$flags = FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES;
+		self::$dictionary = file($filename, $flags);
 	}
 	
 	foreach(self::$dictionary as $pattern) {
+		if($pattern==$password) {
+			return [
+				'score' => -50,
+				'feedback' => "Avoid using common passwords like '{$pattern}'",
+			];
+		}
+		// short passwords already rejected by entropy
+		if(strlen($pattern) < 4) continue;
 		if(mb_strpos($password, $pattern, 0, self::encoding) !== false) {
 			return [
 				'score' => -10 - (strlen($pattern) * self::charscore),
-				'feedback' => "Avoid common patterns like '{$pattern}'",
+				'feedback' => "Avoid including patterns like '{$pattern}'",
 			];
 		}
 	}

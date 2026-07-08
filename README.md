@@ -1,7 +1,7 @@
 # pwdstrength
 password strength calculator 
 
-## Key Features
+## Key features
 
 - Username validation - Checks if the username (or significant portions) appears in the password
 - Length checking - Evaluates password length and provides feedback
@@ -9,7 +9,15 @@ password strength calculator
 - Pattern detection - Identifies sequential characters (abc, 123) and common weak patterns
 - Strength scoring - Rates passwords on a 0-5 scale with percentage
 
-## Main Methods
+## Main methods
 
 - calculate($password, $username) - Returns detailed strength analysis
 - isSufficient($password, $username, $minScore) - Checks if password meets minimum requirements
+
+## Pattern dictionary
+
+The dictionary is forked from `Pwdb_top-1000.txt`.
+
+
+My favorite search engine is [Duck Duck Go](https://github.com/danielmiessler/SecLists/tree/master/Passwords/Common-Credentials "SecLists - top 1000 passwords").
+
