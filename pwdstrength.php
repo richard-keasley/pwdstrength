@@ -8,6 +8,8 @@ class pwdstrength {
 	
 const encoding = 'UTF-8';
 const charscore = 5; // used in calculation of penalties in password
+
+private static $dictionary = null;
 	
 /**
  * Calculate the strength of a password
@@ -22,10 +24,9 @@ const charscore = 5; // used in calculation of penalties in password
  *      - score: Strength as a percentage (0-100)
  */
 public static function calculate($password, $username=null) : array {
-	
 	// Normalize inputs (NFC) to treat composed/decomposed characters consistently
 	$password = self::normalize((string) $password);
-	$username = $username !== null ? self::normalize((string) $username) : null;
+	$username = self::normalize((string) $username);
 	
 	$checknames = [
 		'entropy',
@@ -40,10 +41,11 @@ public static function calculate($password, $username=null) : array {
 		$check_feedback = $res['feedback'] ?? null;
 		if($check_feedback) $feedback = $check_feedback;
 	}
-		
 	// Normalize score to 0-100 range
 	$score = max(0, min(100, array_sum($scores)));
-	$strength = self::getStrength($score);
+	// strength level for a given password score
+	$strength = (int) round($score / 20);
+		
 	$label = match($strength) {
 		0 => 'very weak',
 		1 => 'weak',
@@ -74,20 +76,6 @@ public static function calculate($password, $username=null) : array {
 public static function isSufficient($password, $username=null, $minStrength=2) : bool {
 	$result = self::calculate($password, $username);
 	return $result['strength'] >= $minStrength;
-}
-
-/**
- * Get strength level for a given password score
- * @param int $score (0-100)
- * @return int strength level (0-5)
- */
-private static function getStrength(int $score) : int {
-	if($score<10) return 0;
-	if($score<30) return 1;
-	if($score<50) return 2;
-	if($score<70) return 3;
-	if($score<90) return 4;
-	return 5;
 }
 
 /**
@@ -126,7 +114,7 @@ private static function char_ord(string $char): int {
  * @return array[?feedback, ?score]
  **************************************/
 
-private static function check_entropy(string $password, ?string $username=null) : array {
+private static function check_entropy(string $password, string $username='') : array {
 	// pattern, ASCII size, Unicode size
 	$chargroups = [
 		'lowercase' => ['/\p{Ll}/u', 26, 100],
@@ -173,16 +161,18 @@ private static function check_entropy(string $password, ?string $username=null) 
 	
 	$size = array_sum($sizes);
 	$strlen = mb_strlen($password, self::encoding);
-	// Entropy = log2(charset_size ^ password_length)
-	$score = ($size && $strlen) ? log($size ** $strlen, 2) : 0;
+	// entropy = log2(charset_size ^ password_length)
+	$entropy = ($size && $strlen) ? log($size ** $strlen, 2) : 0;
+	# echo "$password $entropy . <br>";
 	
-	// normalize score 0-100
-	$score = 0.1 * $score ** 1.4;
-	$score = (int) round(min(100, $score));
+	// normalize entropy to score 0-100
+	// tested on spreadsheet
+	$score = ($entropy ** 1.3) * 0.3;
+	$score = (int) round(min(100, $score));	
 	
 	// send feedback
 	$feedback = null;
-	if($strlen < 6) $feedback = 'Make password longer';
+	if($strlen < 6) $feedback = 'Make your password longer';
 	if(!$feedback) {
 		foreach(array_keys($chargroups) as $groupname) {
 			$success = isset($sizes[$groupname]);
@@ -205,7 +195,7 @@ private static function check_entropy(string $password, ?string $username=null) 
 	return $retval;
 }
 
-private static function check_repeated(string $password, ?string $username=null) : array {
+private static function check_repeated(string $password, string $username='') : array {
 	// Check for repeated characters (Unicode-aware)
 	preg_match('/(.)\1{2,}/u', $password, $matches);
 	$match = $matches[0] ?? false;
@@ -218,9 +208,9 @@ private static function check_repeated(string $password, ?string $username=null)
 	];
 }
 
-private static function check_sequential(string $password, ?string $username=null) : array {
+private static function check_sequential(string $password, string $username='') : array {
 	// Check for sequential characters (Unicode-aware)
-	$password = mb_strtolower(self::normalize((string) $password), self::encoding);
+	$password = mb_strtolower($password, self::encoding);
 	$strlen = mb_strlen($password, self::encoding);
 		
 	$maxlen = 0;
@@ -248,11 +238,9 @@ private static function check_sequential(string $password, ?string $username=nul
 	];
 }
 
-private static $dictionary = null;
-
-private static function check_patterns(string $password, ?string $username=null) : array {
+private static function check_patterns(string $password, string $username='') : array {
 	// Check for common password patterns (Unicode-aware lowercase check)
-    $password = mb_strtolower(self::normalize((string) $password), self::encoding);
+    $password = mb_strtolower($password, self::encoding);
 	
 	if(!self::$dictionary) {
 		self::$dictionary = [];
@@ -281,14 +269,14 @@ private static function check_patterns(string $password, ?string $username=null)
 	return [];
 }
 
-private static function check_username(string $password, ?string $username=null) : array {
+private static function check_username(string $password, string $username='') : array {
 	// Check if username is included in the password (Unicode-aware)	
 	
 	if(empty($username)) return [];
 
 	// Ensure both strings are normalized and lowercased 
-	$password = mb_strtolower(self::normalize($password), self::encoding);
-	$username = mb_strtolower(self::normalize((string) $username), self::encoding);
+	$password = mb_strtolower($password, self::encoding);
+	$username = mb_strtolower($username, self::encoding);
 	$user_len = mb_strlen($username, self::encoding);
 	
 	// Check if significant portions of username appear

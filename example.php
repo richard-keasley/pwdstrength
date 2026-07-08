@@ -11,11 +11,11 @@ table {
 	border-collapse: collapse;
 }
 table td {
-	border: 1px solid #eee;
+	border: 1px solid #fed;
 	padding: 0.2em 0.4em;
 }
 table thead td {
-	background: #FEF;
+	background: #F5E4DD;
 	font-weight: bold;
 }
 </style>
@@ -97,6 +97,14 @@ $tries = [
 	'password-ijbkadcihvbwegwe',
 	'ijbkadcihvbwegwe',
 	'short',
+	'shorts',
+	'shortsh',
+	'shortsho',
+	'shortshor',
+	'shortshort',
+	'shortshorts',
+	'shortshortsh',
+	'shortshortsho',
 	'random',
 	'random-abc',
 	'random-731',
