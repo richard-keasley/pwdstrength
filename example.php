@@ -64,8 +64,13 @@ function __tostring() {
 function addrow($arr) {
 	$tr = [];
 	foreach($arr as $colkey=>$td) {
-		if(is_array($td)) $td = implode(', ', $td);
-		$tr[$colkey] = $td;
+		if(is_array($td)) {
+			foreach($td as $tdkey=>$tdval) {
+				$key = sprintf('%s-%s', $colkey[0], $tdkey);
+				$tr[$key] = $tdval;
+			}
+		}
+		else $tr[$colkey] = $td;
 	}
 	$this->tbody[] = $tr;	
 }
@@ -105,10 +110,13 @@ $tries = [
 	'shortshorts',
 	'shortshortsh',
 	'shortshortsho',
+	'shortshortshor',
+	'shortshortshort',
 	'random',
 	'random-abc',
-	'random-731',
-	'thr33--RANDOM--words',
+	'random-71',
+	'Random-71',
+	'3-EASY-words',
 ];
 foreach($tries as $password) {
 	$arr = pwdstrength::calculate($password, $postvals['username']);

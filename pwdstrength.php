@@ -166,19 +166,9 @@ private static function check_entropy(string $password, string $username='') : a
 	# echo "$password $entropy . <br>";
 	
 	// normalize entropy to score 0-100
-	// tested on spreadsheet
-	$score = ($entropy ** 1.3) * 0.3;
-	$score = (int) round(min(100, $score));	
-
-// normalize entropy to score 0-100
-// Uses logarithmic scaling to reward both length and complexity
-// 28 bits = ~30 score, 60 bits = ~70 score, 128+ bits = ~100 score
-$score = ($entropy > 0) 
-    ? (log($entropy + 1) / log(256)) * 100 
-    : 0;
-$score = (int) round(min(100, $score));
-
-	
+	// test on spreadsheet
+	$score = ($entropy ** 1.5) * 0.15;
+	$score = (int) round(min(100, $score));
 	
 	// send feedback
 	$feedback = null;
