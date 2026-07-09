@@ -1,10 +1,10 @@
 {
     "name": "richard-keasley/pwdstrength",
-    "description": "password strength calculator",
+    "description": "Password strength calculator",
     "type": "library",
     "license": "MIT",
     "require": {
-        "php": ">=7.2",
+        "php": "^8.0",
         "ext-mbstring": "*"
     },
     "suggest": {
@@ -15,10 +15,5 @@
     },
     "autoload": {
         "files": ["pwdstrength.php"]
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Basecamp\\Tests\\": "tests/"
-        }
     }
 }
