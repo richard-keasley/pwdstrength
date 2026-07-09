@@ -1,5 +1,5 @@
 <?php
-namespace basecamp;
+namespace basecamp\pwdstrength;
 
 /**
  * Password Strength - A class to calculate and evaluate password strength
@@ -77,6 +77,10 @@ public static function isSufficient($password, $username=null, $minStrength=2) :
 	$result = self::calculate($password, $username);
 	return $result['strength'] >= $minStrength;
 }
+
+public static function example() : string {
+	return __DIR__ . '/example.php';
+} 
 
 /**
  * Normalize string to NFC when possible

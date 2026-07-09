@@ -25,11 +25,8 @@ table thead td {
 
 <form method="POST">
 <?php 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 
-require_once __DIR__ . '/pwdstrength.php';
-use basecamp\pwdstrength;
+use basecamp\pwdstrength\pwdstrength;
 
 class htmtable implements \stringable {
 
@@ -76,8 +73,6 @@ function addrow($arr) {
 }
 
 }
-
-
 
 $postvals = [];
 $format = '<p><label>%1$s</label> <input style="width:30em" name="%1$s" value="%2$s"></p>';
